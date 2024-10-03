@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Video Processing App</title>
+  </head>
+  <body>
+    <h1>Upload and Process Video</h1>
+    <form id="uploadForm">
+      <input type="file" name="video" accept="video/*" required />
+      <button type="submit">Upload and Process</button>
+    </form>
+
+    <!-- Progress Bar and Status -->
+    <div id="progressContainer">
+      <progress id="progressBar" value="0" max="100"></progress>
+      <span id="progressText">Processing...</span>
+    </div>
+
+    <!-- Download Link -->
+    <div id="downloadLink" style="display: none">
+      <a id="download" href="#" download="processed-video.mp4"
+        >Download Processed Video</a
+      >
+    </div>
+
+    <script>
+      const form = document.getElementById("uploadForm");
+      const progressBar = document.getElementById("progressBar");
+      const progressText = document.getElementById("progressText");
+      const downloadDiv = document.getElementById("downloadLink");
+      const downloadLink = document.getElementById("download");
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        progressBar.value = 0;
+        progressText.textContent = "Processing...";
+        downloadDiv.style.display = "none"; // Hide download link initially
+
+        const formData = new FormData(form);
+
+        try {
+          const response = await fetch("/process", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (response.ok) {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = ""; // Store partial JSON strings
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+
+              buffer += decoder.decode(value, { stream: true });
+
+              let boundaryIndex;
+              while ((boundaryIndex = buffer.indexOf("}{")) !== -1) {
+                const jsonChunk = buffer.slice(0, boundaryIndex + 1);
+                processJSONChunk(jsonChunk);
+                buffer = buffer.slice(boundaryIndex + 1);
+              }
+
+              try {
+                if (buffer.trim()) {
+                  processJSONChunk(buffer);
+                }
+              } catch (e) {
+                console.log("Incomplete JSON, waiting for more data");
+              }
+            }
+          } else {
+            alert("Error processing video");
+          }
+        } catch (err) {
+          alert("An error occurred: " + err.message);
+        }
+      });
+
+      function processJSONChunk(chunk) {
+        try {
+          const data = JSON.parse(chunk);
+
+          if (data.progress) {
+            progressBar.value = data.progress;
+            progressText.textContent = `Processing... ${data.progress}%`;
+          } else if (data.message === "completed") {
+            progressText.textContent = "Processing complete!";
+            downloadDiv.style.display = "block";
+            const processedFilename = data.filename;
+            downloadLink.href = `/outputs/${processedFilename}`;
+          }
+        } catch (e) {
+          console.error("Error parsing JSON:", e);
+        }
+      }
+    </script>
+  </body>
+</html>
