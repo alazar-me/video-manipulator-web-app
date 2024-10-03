@@ -11,6 +11,7 @@ app.use(express.static("public"));
 // Set up multer for file uploads
 const upload = multer({ dest: "uploads/" });
 
+<<<<<<< HEAD
 // Pre-recorded inaudible sound file (replace with your .mp4 file)
 const inaudibleAudioFile = path.join(__dirname, "inaudiable.mp3"); // Point to inaudiable.mp4
 
@@ -81,6 +82,42 @@ app.post("/process", upload.single("video"), (req, res) => {
 });
 
 // Start  server
+=======
+// Video processing route
+app.post("/process", upload.single("video"), (req, res) => {
+  const inputFilePath = req.file.path;
+  const outputFilePath = `outputs/${Date.now()}-output.mp4`;
+
+  res.setHeader("Content-Type", "application/json");
+
+  const command = ffmpeg(inputFilePath)
+    .output(outputFilePath)
+    .on("progress", (progress) => {
+      // Round progress percentage to two decimal places
+      const roundedProgress = Math.round(progress.percent * 100) / 100;
+      console.log("Processing: " + roundedProgress + "% done");
+      res.write(JSON.stringify({ progress: roundedProgress }));
+    })
+    .on("end", () => {
+      console.log("Processing complete. Sending file...");
+      res.write(JSON.stringify({ message: "completed" }));
+      res.end(() => {
+        // Ensure file is still available after process completes
+        console.log("File processing completed.");
+        // Clean up input file after processing
+        fs.unlinkSync(inputFilePath);
+      });
+    })
+    .on("error", (err) => {
+      console.error("Error during processing:", err);
+      res.status(500).send(JSON.stringify({ error: "Error processing video" }));
+    });
+
+  command.run();
+});
+
+// Start server
+>>>>>>> 7116c6adad1c85b13dc0f6b1eb86f914b58a6bf5
 app.listen(3000, () => {
   console.log("Server is running on port 3000");
 });
