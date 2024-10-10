@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Video Processing App</title>
   </head>
-  <body>
+  <body style="justify-content: center">
     <h1>Upload and Process Video</h1>
     <form id="uploadForm">
       <input type="file" name="video" accept="video/*" required />
@@ -55,15 +55,8 @@
               const { done, value } = await reader.read();
               if (done) break;
 
-<<<<<<< HEAD
               buffer += decoder.decode(value, { stream: true });
 
-=======
-              // Decode and add to buffer
-              buffer += decoder.decode(value, { stream: true });
-
-              // Try to parse JSON as we read the chunks
->>>>>>> 7116c6adad1c85b13dc0f6b1eb86f914b58a6bf5
               let boundaryIndex;
               while ((boundaryIndex = buffer.indexOf("}{")) !== -1) {
                 const jsonChunk = buffer.slice(0, boundaryIndex + 1);
@@ -71,10 +64,6 @@
                 buffer = buffer.slice(boundaryIndex + 1);
               }
 
-<<<<<<< HEAD
-=======
-              // Process remaining buffer if valid JSON
->>>>>>> 7116c6adad1c85b13dc0f6b1eb86f914b58a6bf5
               try {
                 if (buffer.trim()) {
                   processJSONChunk(buffer);
@@ -91,36 +80,18 @@
         }
       });
 
-<<<<<<< HEAD
-=======
-      // Function to process a JSON chunk
->>>>>>> 7116c6adad1c85b13dc0f6b1eb86f914b58a6bf5
       function processJSONChunk(chunk) {
         try {
           const data = JSON.parse(chunk);
 
           if (data.progress) {
-<<<<<<< HEAD
-=======
-            // Update progress bar and text
->>>>>>> 7116c6adad1c85b13dc0f6b1eb86f914b58a6bf5
             progressBar.value = data.progress;
             progressText.textContent = `Processing... ${data.progress}%`;
           } else if (data.message === "completed") {
             progressText.textContent = "Processing complete!";
-<<<<<<< HEAD
             downloadDiv.style.display = "block";
             const processedFilename = data.filename;
             downloadLink.href = `/outputs/${processedFilename}`;
-=======
-            // Show the download link after completion
-            downloadDiv.style.display = "block";
-
-            const blob = new Blob([chunk], { type: "video/mp4" });
-            const url = window.URL.createObjectURL(blob);
-            downloadLink.href = url;
-            downloadLink.download = "processed-video.mp4";
->>>>>>> 7116c6adad1c85b13dc0f6b1eb86f914b58a6bf5
           }
         } catch (e) {
           console.error("Error parsing JSON:", e);
