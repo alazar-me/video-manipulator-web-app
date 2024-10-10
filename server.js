@@ -80,7 +80,7 @@ app.post("/process", upload.single("video"), (req, res) => {
   });
 });
 
-// Start  server
+// Start server
 app.listen(3000, () => {
   console.log("Server is running on port 3000");
 });
