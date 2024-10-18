@@ -12,6 +12,7 @@
   "dependencies": {
     "exiftool-vendored": "^28.6.0",
     "express": "^4.21.0",
+    "ffmpeg": "^0.0.4",
     "fluent-ffmpeg": "^2.1.3",
     "multer": "^1.4.5-lts.1",
     "stegano": "^1.0.0",

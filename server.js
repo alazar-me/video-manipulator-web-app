@@ -3,7 +3,6 @@ const multer = require("multer");
 const fs = require("fs");
 const ffmpeg = require("fluent-ffmpeg");
 const path = require("path");
-const stegcloak = require("stegcloak");
 const exiftool = require("exiftool-vendored").exiftool;
 const app = express();
 
@@ -17,8 +16,7 @@ const upload = multer({ dest: "uploads/" });
 app.post("/process", upload.single("video"), async (req, res) => {
   const inputFilePath = req.file.path;
   const outputFilePath = `outputs/${Date.now()}-output.mkv`;
-  const inaudibleAudioPath = path.join(__dirname, "inaudible.mp4");
-  const hiddenFilePath = path.join(__dirname, "hidden.txt");
+  const inaudibleAudioPath = path.join(__dirname, "inaudiable.mp3");
 
   console.log(`Processing video: ${inputFilePath}`);
 
@@ -54,23 +52,6 @@ app.post("/process", upload.single("video"), async (req, res) => {
           reject(err);
         })
         .run();
-    });
-
-    // Embed hidden file into the video using Stegcloak
-    await new Promise((resolve, reject) => {
-      const stegcloakInstance = new stegcloak();
-      stegcloakInstance
-        .embed(fs.readFileSync(hiddenFilePath, "utf8"), "secretPass", {
-          compressed: true,
-        })
-        .then((encryptedData) => {
-          fs.writeFileSync(outputFilePath, encryptedData); // Save the embedded file to the output path
-          resolve();
-        })
-        .catch((err) => {
-          console.error("Error embedding file:", err);
-          reject(err);
-        });
     });
 
     // Merge inaudible audio with the processed video
