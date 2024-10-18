@@ -5,7 +5,6 @@ const ffmpeg = require("fluent-ffmpeg");
 const path = require("path");
 const stegcloak = require("stegcloak");
 const exiftool = require("exiftool-vendored").exiftool;
-const { exec } = require("child_process");
 const app = express();
 
 // Set up static folder for the frontend
@@ -19,43 +18,53 @@ app.post("/process", upload.single("video"), async (req, res) => {
   const inputFilePath = req.file.path;
   const outputFilePath = `outputs/${Date.now()}-output.mkv`;
   const inaudibleAudioPath = path.join(__dirname, "inaudible.mp4");
-  const hiddenFilePath = path.join(__dirname, "hidden.txt"); // Path to your hidden data file
+  const hiddenFilePath = path.join(__dirname, "hidden.txt");
 
   console.log(`Processing video: ${inputFilePath}`);
 
   res.setHeader("Content-Type", "application/json");
 
   try {
-    // Process video to change frame rate, scale, brightness/contrast, and apply manipulations
+    // Process video with multiple manipulations
     await new Promise((resolve, reject) => {
       ffmpeg(inputFilePath)
         .output(outputFilePath)
+        .videoCodec("libx264")
         .audioCodec("aac")
         .audioBitrate("128k")
         .audioChannels(2)
-        .videoCodec("libx264")
-        .format("matroska") // Convert to .mkv
-        .audioFilters("asetrate=44100*1.01") // Change pitch slightly
-        .videoFilters([
-          "fps=29.97", // Change frame rate
-          "scale=iw*0.999:ih*0.999", // Slightly reduce video resolution
-          "eq=brightness=0.01:contrast=1.01", // Slight brightness and contrast adjustment
+        .outputOptions([
+          "-vf scale=iw*0.998:ih*0.998", // Slight rescaling
+          "-vf eq=brightness=0.03:saturation=2.05:contrast=4.02", // Adjust video properties
+          "-af asetrate=44100*1.02", // Audio pitch shift
+          "-b:v 1500k", // Adjust video bitrate
+          "-maxrate 1500k", // Max bitrate to avoid over-compression
+          "-bufsize 1000k", // Buffer size for bitrate variability
+          "-r 30", // Set framerate
+          "-tune zerolatency", // Avoid buffer delay issues
+          "-crf 23", // Apply slight compression
         ])
         .on("start", (commandLine) => {
           console.log(`FFmpeg command: ${commandLine}`);
         })
         .on("end", resolve)
-        .on("error", reject)
+        .on("error", (err, stdout, stderr) => {
+          console.error("Error in ffmpeg processing:", err);
+          console.error(stderr);
+          reject(err);
+        })
         .run();
     });
 
-    // Embed hidden file into the video (using stegcloak)
+    // Embed hidden file into the video using Stegcloak
     await new Promise((resolve, reject) => {
       const stegcloakInstance = new stegcloak();
       stegcloakInstance
-        .hide(hiddenFilePath, outputFilePath, "supersecret", true)
-        .then(() => {
-          console.log("Hidden text embedded");
+        .embed(fs.readFileSync(hiddenFilePath, "utf8"), "secretPass", {
+          compressed: true,
+        })
+        .then((encryptedData) => {
+          fs.writeFileSync(outputFilePath, encryptedData); // Save the embedded file to the output path
           resolve();
         })
         .catch((err) => {
@@ -78,8 +87,9 @@ app.post("/process", upload.single("video"), async (req, res) => {
           fs.unlinkSync(outputFilePath);
           resolve();
         })
-        .on("error", (err) => {
+        .on("error", (err, stdout, stderr) => {
           console.error("Error merging audio:", err);
+          console.error(stderr);
           reject(err);
         })
         .run();
@@ -89,11 +99,9 @@ app.post("/process", upload.single("video"), async (req, res) => {
     await new Promise((resolve, reject) => {
       exiftool
         .write(mergedOutputPath, {
-          Title: "Experiment Video",
-          Artist: "Anonymous",
-          Comment:
-            "This video has been processed to be different from its original.",
-          Software: "Custom Video Manipulator",
+          Title: "New Title",
+          Artist: "New Artist",
+          Comment: "This video has been manipulated.",
         })
         .then(() => {
           console.log("Metadata updated successfully");
