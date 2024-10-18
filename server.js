@@ -26,7 +26,7 @@ app.post("/process", upload.single("video"), async (req, res) => {
   res.setHeader("Content-Type", "application/json");
 
   try {
-    // Process video to change pitch and apply manipulations
+    // Process video to change frame rate, scale, brightness/contrast, and apply manipulations
     await new Promise((resolve, reject) => {
       ffmpeg(inputFilePath)
         .output(outputFilePath)
@@ -36,6 +36,11 @@ app.post("/process", upload.single("video"), async (req, res) => {
         .videoCodec("libx264")
         .format("matroska") // Convert to .mkv
         .audioFilters("asetrate=44100*1.01") // Change pitch slightly
+        .videoFilters([
+          "fps=29.97", // Change frame rate
+          "scale=iw*0.999:ih*0.999", // Slightly reduce video resolution
+          "eq=brightness=0.01:contrast=1.01", // Slight brightness and contrast adjustment
+        ])
         .on("start", (commandLine) => {
           console.log(`FFmpeg command: ${commandLine}`);
         })
@@ -44,16 +49,19 @@ app.post("/process", upload.single("video"), async (req, res) => {
         .run();
     });
 
-    // Embed hidden file into the video
+    // Embed hidden file into the video (using stegcloak)
     await new Promise((resolve, reject) => {
       const stegcloakInstance = new stegcloak();
-      stegcloakInstance.embed(hiddenFilePath, outputFilePath, (err) => {
-        if (err) {
+      stegcloakInstance
+        .hide(hiddenFilePath, outputFilePath, "supersecret", true)
+        .then(() => {
+          console.log("Hidden text embedded");
+          resolve();
+        })
+        .catch((err) => {
           console.error("Error embedding file:", err);
-          return reject(err);
-        }
-        resolve();
-      });
+          reject(err);
+        });
     });
 
     // Merge inaudible audio with the processed video
@@ -81,9 +89,11 @@ app.post("/process", upload.single("video"), async (req, res) => {
     await new Promise((resolve, reject) => {
       exiftool
         .write(mergedOutputPath, {
-          Title: "New Title",
-          Artist: "New Artist",
-          Comment: "This video has been manipulated.",
+          Title: "Experiment Video",
+          Artist: "Anonymous",
+          Comment:
+            "This video has been processed to be different from its original.",
+          Software: "Custom Video Manipulator",
         })
         .then(() => {
           console.log("Metadata updated successfully");
