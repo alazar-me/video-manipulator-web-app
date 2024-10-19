@@ -3,9 +3,7 @@ const multer = require("multer");
 const fs = require("fs");
 const ffmpeg = require("fluent-ffmpeg");
 const path = require("path");
-const stegcloak = require("stegcloak");
 const exiftool = require("exiftool-vendored").exiftool;
-const { exec } = require("child_process");
 const app = express();
 
 // Set up static folder for the frontend
@@ -18,42 +16,42 @@ const upload = multer({ dest: "uploads/" });
 app.post("/process", upload.single("video"), async (req, res) => {
   const inputFilePath = req.file.path;
   const outputFilePath = `outputs/${Date.now()}-output.mkv`;
-  const inaudibleAudioPath = path.join(__dirname, "inaudible.mp4");
-  const hiddenFilePath = path.join(__dirname, "hidden.txt"); // Path to your hidden data file
+  const inaudibleAudioPath = path.join(__dirname, "inaudiable.mp3");
 
   console.log(`Processing video: ${inputFilePath}`);
 
   res.setHeader("Content-Type", "application/json");
 
   try {
-    // Process video to change pitch and apply manipulations
+    // Process video with multiple manipulations
     await new Promise((resolve, reject) => {
       ffmpeg(inputFilePath)
         .output(outputFilePath)
+        .videoCodec("libx264")
         .audioCodec("aac")
         .audioBitrate("128k")
         .audioChannels(2)
-        .videoCodec("libx264")
-        .format("matroska") // Convert to .mkv
-        .audioFilters("asetrate=44100*1.01") // Change pitch slightly
+        .outputOptions([
+          "-vf scale=iw*0.998:ih*0.998", // Slight rescaling
+          "-vf eq=brightness=0.03:saturation=2.05:contrast=4.02", // Adjust video properties
+          "-af asetrate=44100*1.02", // Audio pitch shift
+          "-b:v 1500k", // Adjust video bitrate
+          "-maxrate 1500k", // Max bitrate to avoid over-compression
+          "-bufsize 1000k", // Buffer size for bitrate variability
+          "-r 30", // Set framerate
+          "-tune zerolatency", // Avoid buffer delay issues
+          "-crf 23", // Apply slight compression
+        ])
         .on("start", (commandLine) => {
           console.log(`FFmpeg command: ${commandLine}`);
         })
         .on("end", resolve)
-        .on("error", reject)
+        .on("error", (err, stdout, stderr) => {
+          console.error("Error in ffmpeg processing:", err);
+          console.error(stderr);
+          reject(err);
+        })
         .run();
-    });
-
-    // Embed hidden file into the video
-    await new Promise((resolve, reject) => {
-      const stegcloakInstance = new stegcloak();
-      stegcloakInstance.embed(hiddenFilePath, outputFilePath, (err) => {
-        if (err) {
-          console.error("Error embedding file:", err);
-          return reject(err);
-        }
-        resolve();
-      });
     });
 
     // Merge inaudible audio with the processed video
@@ -70,8 +68,9 @@ app.post("/process", upload.single("video"), async (req, res) => {
           fs.unlinkSync(outputFilePath);
           resolve();
         })
-        .on("error", (err) => {
+        .on("error", (err, stdout, stderr) => {
           console.error("Error merging audio:", err);
+          console.error(stderr);
           reject(err);
         })
         .run();
